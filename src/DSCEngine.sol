@@ -391,7 +391,9 @@ contract DSCEngine is ReentrancyGuard {
 
         // $1000 ETH / 100 DSC
         // $1000 ETH * 50 = 50,000 /100 = 500 = (500 / 100) > 1 => Healthy
-
+        if (totalDscMinted == 0) {
+            revert DSCEngine__NeedsMoreThanZero(); // to prevent division by zero
+        }
         return (collateralAdjustedForThreshold * PRECISION) / totalDscMinted;
     }
 
