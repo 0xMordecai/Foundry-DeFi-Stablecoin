@@ -450,4 +450,15 @@ contract DSCEngine is ReentrancyGuard {
         return
             ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
     }
+
+    // for testing
+    function getAccountInformation(
+        address user
+    )
+        public
+        view
+        returns (uint256 totalDscMinted, uint256 collateralValueInUsd)
+    {
+        (totalDscMinted, collateralValueInUsd) = _getAccountInformation(user);
+    }
 }
