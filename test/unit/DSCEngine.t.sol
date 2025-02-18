@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {DeployDSC} from "../../script/DeployDSC.s.sol";
 import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "test/mock/ERC20Mock.sol";
+import {MockV3Aggregator} from "../mock/MockV3Aggregator.sol";
 
 contract DSCEngineTest is Test {
     DeployDSC deployer;
@@ -22,6 +23,22 @@ contract DSCEngineTest is Test {
     uint256 public constant AMOUNT_COLLATERAL = 10 ether;
     uint256 public constant STARTING_ERC20_BALANCE = 10 ether;
 
+    uint256 amountCollateral = 10 ether;
+    uint256 amountToMint = 100 ether;
+    address public user = address(1);
+
+    event CollateralDeposited(
+        address indexed user,
+        address indexed token,
+        uint256 indexed amount
+    );
+    event collateralRedeemed(
+        address indexed redeemedFrom,
+        address redeemedTo,
+        uint256 indexed amount,
+        address token
+    );
+
     function setUp() public {
         deployer = new DeployDSC();
         (dsc, dsce, config) = deployer.run();
@@ -29,6 +46,7 @@ contract DSCEngineTest is Test {
             .activeNetworkConfig();
 
         ERC20Mock(weth).mint(USER, STARTING_ERC20_BALANCE);
+        ERC20Mock(wbtc).mint(USER, STARTING_ERC20_BALANCE);
     }
 
     //////////////////////////
@@ -62,7 +80,7 @@ contract DSCEngineTest is Test {
         assertEq(expectedUsd, actualUsd);
     }
 
-    function testGetUsdValueForToken() public {
+    function testGetTokenAmountFromUsd() public {
         uint256 usdAmount = 100 ether;
         uint256 expectedWeth = 0.05 ether;
         uint256 actualWeth = dsce.getTokenAmountFromUsd(weth, usdAmount);
@@ -101,6 +119,14 @@ contract DSCEngineTest is Test {
         dsce.depositCollateral(weth, AMOUNT_COLLATERAL);
         vm.stopPrank();
         _;
+    }
+
+    function testCanDepositCollateralWithoutMinting()
+        public
+        depositedCollateral
+    {
+        uint256 userBalance = dsc.balanceOf(USER);
+        assertEq(userBalance, 0);
     }
 
     function testDepositCollateralAndGetAccountInfo()

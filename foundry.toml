@@ -2,3 +2,7 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+[invariant]
+runs = 1000
+depth = 128
+fail_on_revert = false
