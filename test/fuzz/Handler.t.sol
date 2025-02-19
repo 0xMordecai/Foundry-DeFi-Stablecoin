@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
 import {ERC20Mock} from "../mock/ERC20Mock.sol";
+import {MockV3Aggregator} from "../mock/MockV3Aggregator.sol";
 
 contract Handler is Test {
     DSCEngine dsce;
@@ -13,6 +14,12 @@ contract Handler is Test {
     ERC20Mock wbtc;
 
     uint256 MAX_DEPOSIT_SIZE = type(uint96).max;
+    MockV3Aggregator public ethUsdPriceFeed;
+    MockV3Aggregator public btcUsdPriceFeed;
+    // **[Ghost Variables]**
+    uint256 public timesMintIsCalled;
+
+    address[] usersWithCollateralDeposited;
 
     constructor(DSCEngine _dsce, DecentralizedStableCoin _dsc) {
         dsce = _dsce;
@@ -21,6 +28,13 @@ contract Handler is Test {
         address[] memory collateralTokens = dsce.getCollateralTokens();
         weth = ERC20Mock(collateralTokens[0]);
         wbtc = ERC20Mock(collateralTokens[1]);
+
+        ethUsdPriceFeed = MockV3Aggregator(
+            dsce.getCollateralTokenPriceFeed(address(weth))
+        );
+        btcUsdPriceFeed = MockV3Aggregator(
+            dsce.getCollateralTokenPriceFeed(address(wbtc))
+        );
     }
 
     function depositCollateral(
@@ -37,6 +51,9 @@ contract Handler is Test {
 
         dsce.depositCollateral(address(_collateral), _amountCollateral);
         vm.stopPrank();
+        //  track the address which deposit collateral,
+        //  and then have the address calling mintDsc derived from those tracked addresses
+        usersWithCollateralDeposited.push(msg.sender);
     }
 
     function redeemCollateral(
@@ -55,9 +72,23 @@ contract Handler is Test {
         dsce.redeemCollateral(address(collateral), amountCollateral);
     }
 
-    function mintDsc(uint256 amount) public {
+    /**
+    * What's happening in our test is that the address that was minting DSC was always different from the addresses which had deposited collateral!
+    * In order to mitigate this issue, we'll need to track the address which deposit collateral,
+    * and then have the address calling mintDsc derived from those tracked addresses.
+    * Let's declare an address array to which addresses that have deposited collateral can be added.
+
+ */
+    function mintDsc(uint256 amount, uint256 addressSeed) public {
+        if (usersWithCollateralDeposited.length == 0) {
+            return;
+        }
+
+        address sender = usersWithCollateralDeposited[
+            addressSeed % usersWithCollateralDeposited.length
+        ];
         (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce
-            .getAccountInformation(msg.sender);
+            .getAccountInformation(sender);
 
         uint256 maxDscToMint = (collateralValueInUsd / 2) - totalDscMinted;
         if (maxDscToMint < 0) {
@@ -65,14 +96,21 @@ contract Handler is Test {
         }
 
         amount = bound(amount, 0, maxDscToMint);
-        if (amount < 0) {
+        if (amount <= 0) {
             return;
         }
 
-        vm.startPrank(msg.sender);
+        vm.startPrank(sender);
         dsce.mintDsc(amount);
         vm.stopPrank();
+
+        timesMintIsCalled++;
     }
+
+    // function updateCollateralPrice(uint96 newPrice) public {
+    //     int256 newPriceInt = int256(uint256(newPrice));
+    //     ethUsdPriceFeed.updateAnswer(newPriceInt);
+    // }
 
     // Helper Functions
 

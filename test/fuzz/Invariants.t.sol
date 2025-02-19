@@ -22,11 +22,14 @@ contract Invariants is StdInvariant, Test {
     Handler handler;
     address weth;
     address wbtc;
+    address public ethUsdPriceFeed;
+    address public btcUsdPriceFeed;
 
     function setUp() public {
         deployer = new DeployDSC();
         (dsc, dsce, config) = deployer.run();
-        (, , weth, wbtc, ) = config.activeNetworkConfig();
+        (ethUsdPriceFeed, btcUsdPriceFeed, weth, wbtc, ) = config
+            .activeNetworkConfig();
         handler = new Handler(dsce, dsc);
         targetContract(address(handler));
     }
@@ -45,6 +48,7 @@ contract Invariants is StdInvariant, Test {
 
         console.log("wethValue: ", wethValue);
         console.log("wbtcValue: ", wbtcValue);
+        console.log("Times mint is called: ", handler.timesMintIsCalled());
 
         assert(totalSupply <= wethValue + wbtcValue);
     }
